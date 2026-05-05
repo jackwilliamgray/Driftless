@@ -10,6 +10,7 @@ mod tray;
 
 use std::sync::Arc;
 use tauri::Manager;
+use tauri_plugin_autostart::MacosLauncher;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -36,6 +37,10 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            None,
+        ))
         .manage(shared.clone())
         .invoke_handler(tauri::generate_handler![
             commands::auth_status,

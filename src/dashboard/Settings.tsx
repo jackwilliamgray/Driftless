@@ -1,4 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  disable as disableAutostart,
+  enable as enableAutostart,
+  isEnabled as isAutostartEnabled,
+} from "@tauri-apps/plugin-autostart";
 import type {
   AppSnapshot,
   DiscoveredRepo,
@@ -51,6 +56,26 @@ export function Settings({ snapshot, prefs, onPrefsChange }: SettingsProps) {
   const [globalExcludeInput, setGlobalExcludeInput] = useState("");
   const [repoExcludeInputs, setRepoExcludeInputs] = useState<Record<string, string>>({});
   const [excludeError, setExcludeError] = useState<string | null>(null);
+  const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
+  const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
+
+  useEffect(() => {
+    isAutostartEnabled()
+      .then(setLaunchAtLogin)
+      .catch((e) => setLaunchAtLoginError(String(e)));
+  }, []);
+
+  const onToggleLaunchAtLogin = async (next: boolean) => {
+    setLaunchAtLoginError(null);
+    setLaunchAtLogin(next);
+    try {
+      if (next) await enableAutostart();
+      else await disableAutostart();
+    } catch (e) {
+      setLaunchAtLogin(!next);
+      setLaunchAtLoginError(String(e));
+    }
+  };
 
   const onRemove = async (owner: string, name: string) => {
     setError(null);
@@ -677,7 +702,23 @@ export function Settings({ snapshot, prefs, onPrefsChange }: SettingsProps) {
       </label>
 
       <h3 style={{ marginTop: 24 }}>App</h3>
-      <button onClick={() => quitApp()}>Quit Driftless</button>
+      <label>
+        <input
+          type="checkbox"
+          checked={launchAtLogin ?? false}
+          disabled={launchAtLogin === null}
+          onChange={(e) => onToggleLaunchAtLogin(e.target.checked)}
+        />
+        Open Driftless at login
+      </label>
+      {launchAtLoginError && (
+        <div style={{ color: "#ef4444", fontSize: 12, marginTop: 4 }}>
+          {launchAtLoginError}
+        </div>
+      )}
+      <div style={{ marginTop: 12 }}>
+        <button onClick={() => quitApp()}>Quit Driftless</button>
+      </div>
         </>
       )}
     </div>
