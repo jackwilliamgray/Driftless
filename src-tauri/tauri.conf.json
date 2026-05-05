@@ -1,0 +1,81 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Driftless",
+  "version": "0.1.0",
+  "identifier": "com.jackgray.driftless",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "tray-popup",
+        "title": "Driftless",
+        "url": "index.html",
+        "width": 360,
+        "height": 480,
+        "minWidth": 320,
+        "minHeight": 200,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "focus": false,
+        "shadow": true,
+        "hiddenTitle": true,
+        "acceptFirstMouse": true
+      },
+      {
+        "label": "dashboard",
+        "title": "Driftless — Dashboard",
+        "url": "index.html#/dashboard",
+        "width": 1080,
+        "height": 720,
+        "minWidth": 720,
+        "minHeight": 480,
+        "resizable": true,
+        "decorations": true,
+        "visible": false,
+        "skipTaskbar": false,
+        "titleBarStyle": "Visible"
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["app", "dmg"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "DeveloperTool",
+    "shortDescription": "GitHub Actions tracker",
+    "longDescription": "Driftless lives in your menu bar and surfaces the state of GitHub Actions runs on your open pull requests and watched repos.",
+    "macOS": {
+      "minimumSystemVersion": "12.0",
+      "dmg": {
+        "appPosition": { "x": 180, "y": 170 },
+        "applicationFolderPosition": { "x": 480, "y": 170 },
+        "windowSize": { "width": 660, "height": 400 }
+      }
+    },
+    "resources": [
+      "icons/tray-idle.png",
+      "icons/tray-pending.png",
+      "icons/tray-success.png",
+      "icons/tray-failure.png"
+    ]
+  }
+}
