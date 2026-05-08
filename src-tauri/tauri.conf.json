@@ -70,12 +70,6 @@
         "applicationFolderPosition": { "x": 480, "y": 170 },
         "windowSize": { "width": 660, "height": 400 }
       }
-    },
-    "resources": [
-      "icons/tray-idle.png",
-      "icons/tray-pending.png",
-      "icons/tray-success.png",
-      "icons/tray-failure.png"
-    ]
+    }
   }
 }

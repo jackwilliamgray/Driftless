@@ -9,10 +9,10 @@ use crate::state::AggregateState;
 
 const TRAY_ICON_ID: &str = "main-tray";
 
-const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
-const ICON_PENDING: &[u8] = include_bytes!("../icons/tray-pending.png");
-const ICON_SUCCESS: &[u8] = include_bytes!("../icons/tray-success.png");
-const ICON_FAILURE: &[u8] = include_bytes!("../icons/tray-failure.png");
+const ICON_IDLE: &[u8] = include_bytes!("../../icons/icon-idle.png");
+const ICON_PENDING: &[u8] = include_bytes!("../../icons/icon-pending.png");
+const ICON_SUCCESS: &[u8] = include_bytes!("../../icons/icon-success.png");
+const ICON_FAILURE: &[u8] = include_bytes!("../../icons/icon-failed.png");
 // Reuses the pending icon as the universal "working" indicator while a
 // poll cycle is in flight, regardless of the last aggregate state.
 const ICON_REFRESHING: &[u8] = ICON_PENDING;
