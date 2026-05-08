@@ -1,4 +1,4 @@
-# Driftless
+# <img src="icons/icon-idle.svg" alt="" width="40" height="40" align="absmiddle"> Driftless
 
 A macOS menu-bar app that keeps a steady eye on your GitHub Actions —
 the runs on your own pull requests and the runs in repositories you
