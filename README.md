@@ -1,108 +1,154 @@
 # Driftless
 
-A macOS menu-bar app for tracking GitHub Actions: the runs on your own pull
-requests plus runs in repos you choose to watch. Tray icon shows aggregate
-state at a glance, click to open a popup with per-PR/per-repo status, double
-click for a full dashboard with per-job breakdown.
+A macOS menu-bar app that keeps a steady eye on your GitHub Actions —
+the runs on your own pull requests and the runs in repositories you
+choose to watch — without making you tab over to GitHub to check.
 
-Stack: Tauri 2 + React 19 + TypeScript + Vite.
+The tray icon shows the worst current state across everything you
+track, the popup gives a per-PR / per-repo breakdown, and the
+dashboard drills into individual workflow runs and jobs.
 
-## Prerequisites
+## What it's for
 
-- macOS 12+
-- Rust toolchain (`rustup` recent stable)
-- Node 20+, pnpm 10+
-- GitHub CLI (`gh`) — auth is read fresh from `gh auth token` on every poll.
-  Sign in once with `gh auth login`; no app-side token storage.
+- Knowing at a glance whether your PRs are green, pending, or broken.
+- Catching a failed run on `main` of a watched repo without watching
+  GitHub.
+- Getting a macOS notification when a workflow on a tracked PR fails
+  or turns all-green, instead of polling the Actions tab manually.
+- Grouping repos into projects so you can keep an eye on a whole team's
+  pipelines in one place.
 
-## Run
+## Requirements
 
-```sh
-pnpm install
-pnpm tauri dev
-```
+- **macOS 12 (Monterey) or newer**, Apple Silicon or Intel.
+- **GitHub CLI** (`gh`), installed and authenticated. Driftless reads
+  your token from `gh auth token` on every poll and never stores its
+  own copy. If you don't have `gh` yet:
 
-You should see a tray icon in the macOS menu bar (no Dock icon — the app
-runs as an `Accessory` activation policy). Click the tray icon to toggle the
-popup; double-click or use the popup's "Open dashboard…" button for the full
-window.
+  ```sh
+  brew install gh
+  gh auth login
+  ```
 
-## How it works
+## Install
 
-- **Auth.** `src-tauri/src/auth.rs` shells out to `gh auth token` on each poll
-  and validates the token via `GET /user`. No token is persisted.
-- **Polling.** A single `tokio` task in `src-tauri/src/poller.rs` owns the
-  GitHub poll loop. Adaptive interval: 15 s when any tracked run is active,
-  60 s when everything is stable, exponential backoff on errors. ETags on
-  workflow-runs requests to keep rate-limit usage low.
-- **Data.** Open PRs come from a single GraphQL `viewer.pullRequests` query
-  (`src-tauri/src/github/graphql.rs`); workflow runs from REST
-  (`/repos/{owner}/{repo}/actions/runs`); jobs lazy-loaded only when the
-  dashboard expands a run row.
-- **Tray icon.** `src-tauri/src/tray.rs` swaps the tray PNG between
-  `tray-{idle,pending,success,failure}.png` based on aggregate state. Icons
-  are rendered as macOS template images so they adapt to dark/light menu bars.
-- **Notifications.** `src-tauri/src/notify.rs` diffs the previous
-  poll's run-id → conclusion map against the new one. Fires macOS
-  notifications on transition to failure and on a PR turning all-green.
-  Suppressed on cold start (no baseline yet).
-- **Persistence.** Watched repos, notification prefs, and the last-known
-  conclusion map live in `tauri-plugin-store`'s JSON file in the app data
-  directory.
+1. Download the latest `Driftless_<version>_<arch>.dmg` from the
+   [Releases](../../releases) page.
+2. Open the DMG and drag **Driftless.app** into **Applications**.
+3. Eject the DMG and launch Driftless from Applications, Spotlight, or
+   Launchpad.
 
-## Project layout
+> The build is currently unsigned, so the first launch will trigger a
+> Gatekeeper warning. Right-click the app in Applications and choose
+> **Open** to allow it the first time, or run
+> `xattr -dr com.apple.quarantine /Applications/Driftless.app`.
 
-```
-.
-├── index.html                       # single HTML, both windows load it
-├── src/                             # React frontend
-│   ├── main.tsx                     # window-label routing → Popup or Dashboard
-│   ├── popup/                       # tray dropdown UI
-│   ├── dashboard/                   # full dashboard + Settings
-│   ├── components/StatusIcon.tsx
-│   ├── lib/                         # invoke / event wrappers, types
-│   └── styles/app.css
-└── src-tauri/
-    ├── tauri.conf.json              # two windows: tray-popup, dashboard
-    ├── capabilities/default.json    # plugin permissions for both windows
-    ├── icons/tray-{idle,pending,success,failure}.png
-    └── src/
-        ├── lib.rs                   # setup(): tray, plugins, poller
-        ├── auth.rs                  # gh token shellout
-        ├── github/                  # API client, GraphQL + REST
-        ├── poller.rs                # adaptive tokio loop
-        ├── tray.rs                  # tray icon + popup positioning
-        ├── notify.rs                # transition diff + notifications
-        ├── store.rs                 # config persistence
-        ├── commands.rs              # #[tauri::command] surface
-        └── state.rs                 # shared app state, aggregation
-```
+There's no Dock icon — Driftless lives entirely in the menu bar. Look
+for its icon up next to the clock, Wi-Fi, and battery indicators.
 
-## Tests
+## First-run setup
 
-`cargo test --lib` runs the unit suite for the aggregation and
-notification-transition logic — the only places where pure logic is non-trivial.
+1. Make sure you've run `gh auth login` at least once. Driftless will
+   surface a "Not signed in to GitHub CLI" message in the popup if it
+   can't find a token.
+2. Click the tray icon to open the popup. Your open pull requests
+   should populate within a few seconds.
+3. From the popup, click **Open dashboard…** to add watched repos and
+   tune notification preferences.
 
-Feature correctness is dominantly a manual job: does the tray icon match
-reality? Run `pnpm tauri dev`, push a commit to a PR, watch the icon cycle.
+To have Driftless start automatically when you log in, enable
+**Settings → Start at login** in the dashboard.
+
+## Using the app
+
+### Tray icon
+
+The tray icon reflects the worst aggregate state across everything you
+track:
+
+| Icon       | Meaning                                              |
+| ---------- | ---------------------------------------------------- |
+| Idle       | Nothing pending, nothing failing.                    |
+| Pending    | At least one tracked workflow is currently running.  |
+| Success    | All tracked workflows finished green.                |
+| Failure    | At least one tracked workflow failed or timed out.   |
+| Refreshing | Briefly shown while a poll cycle is in flight.       |
+
+- **Click** the tray icon to toggle the popup.
+- **Double-click** the tray icon, or use the menu's **Open
+  Dashboard**, to surface the full dashboard window.
+- **Right-click** (or click the menu arrow) for **Open Dashboard**,
+  **Refresh**, and **Quit**.
+
+### Popup
+
+A compact list of your open pull requests and your watched repos, each
+with their aggregate status and the most recent runs as small chips.
+Clicking a PR row opens it on github.com; clicking a watched repo opens
+its Actions tab.
+
+The **Refresh** button forces an immediate poll. While polling, both
+the button and the tray icon show a loading state.
+
+### Dashboard
+
+The full window has three sections:
+
+- **My pull requests** — every open PR you authored, with its
+  workflow runs grouped underneath. Expand a run to see its jobs and
+  per-step status, or click through to the run on github.com.
+- **Watched repos** — repos you've explicitly added, grouped by
+  project. Within each project, repos are sorted by most-recent
+  workflow activity (alphabetical fallback for repos with no recent
+  runs). Use the project headers to collapse groups you don't care
+  about right now.
+- **Settings** — see below.
 
 ## Configuration
 
-Open the dashboard → Settings to:
+All configuration lives in **Dashboard → Settings**:
 
-- add/remove watched repos (format `owner/repo`, optional branch filter)
-- toggle which notification transitions fire
+- **Watched repos.** Add a repo as `owner/repo`, optionally with a
+  branch filter (e.g. `main`) to narrow the runs that count toward its
+  status. You can also point Driftless at a local folder and it will
+  scan for git repositories with GitHub remotes to bulk-add.
+- **Excluded workflows.** Suppress noisy or irrelevant workflows
+  globally or per-repo so they don't poison your aggregate state.
+- **Projects.** Group watched repos under a named project — either by
+  explicit membership or by name prefix (e.g. `team-platform-`).
+  Projects can be toggled on/off to temporarily hide a whole group.
+- **Notifications.** Pick which transitions fire macOS notifications:
+  failures, first all-green after a failure, or every transition.
+- **Start at login.** Toggle Driftless launching automatically when
+  you log in to macOS.
 
-There are no command-line flags. Token comes from `gh`. Logs go to stderr;
-crank verbosity with `DRIFTLESS_LOG=trace pnpm tauri dev`.
+Settings persist locally in
+`~/Library/Application Support/com.jackgray.driftless/`.
 
-## Known v1 gaps
+## Troubleshooting
 
-- Tray icons are placeholder copies of the app icon. Replace
-  `src-tauri/icons/tray-*.png` with proper template images (B&W with alpha,
-  ~22×22 logical, 2× retina) for them to render correctly in the menu bar.
-- LSUIElement is set at runtime via `set_activation_policy(Accessory)` rather
-  than in the bundle plist, so there's a brief Dock-icon flicker on launch.
-  For a polished release, add an `Info.plist` override.
-- No auto-launch; install via `tauri-plugin-autostart` if wanted.
-- App is unsigned — Gatekeeper warning on first launch outside `tauri dev`.
+- **"Not signed in to GitHub CLI"** — run `gh auth login` in a
+  terminal, then click **Refresh** in the popup. No restart needed.
+- **Status hasn't updated.** The poll interval is 60 s when everything
+  is stable, 15 s when something is in flight. Click **Refresh** to
+  force an immediate poll.
+- **Rate-limited.** The dashboard sidebar shows your remaining GitHub
+  REST quota. If it's low, reduce the number of watched repos or
+  remove broad branch filters; Driftless uses ETags to keep usage low,
+  but watching dozens of busy repos is still going to spend requests.
+- **Icon never changes.** Confirm the tray icon you see is actually
+  Driftless (it lives in the right side of the menu bar) and that
+  `gh auth status` succeeds.
+- **Reset everything.** Quit the app, delete
+  `~/Library/Application Support/com.jackgray.driftless/`, and
+  relaunch.
+
+## Development
+
+If you want to build from source, contribute, or understand how it
+works internally:
+
+- [`docs/development.md`](docs/development.md) — toolchain,
+  dev/build/release commands, signing.
+- [`docs/architecture.md`](docs/architecture.md) — auth, polling,
+  data flow, layout.
