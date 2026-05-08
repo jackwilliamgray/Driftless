@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Menu-bar tracker for GitHub Actions on your PRs and watched repos"
 authors = ["Jack Gray"]
 edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/jackwilliamgray/Driftless"
+homepage = "https://github.com/jackwilliamgray/Driftless"
 
 [profile.release]
 panic = "abort"

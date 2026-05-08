@@ -152,3 +152,8 @@ works internally:
   dev/build/release commands, signing.
 - [`docs/architecture.md`](docs/architecture.md) — auth, polling,
   data flow, layout.
+
+## License
+
+Driftless is released under the
+[GNU General Public License v3.0 or later](LICENSE).
