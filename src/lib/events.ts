@@ -9,3 +9,6 @@ export const onAuthChanged = (handler: (a: AuthStatus) => void): Promise<Unliste
 
 export const onPollError = (handler: (err: PollError) => void): Promise<UnlistenFn> =>
   listen<PollError>("poll:error", (e) => handler(e.payload));
+
+export const onPollStarted = (handler: () => void): Promise<UnlistenFn> =>
+  listen<string>("poll:started", () => handler());

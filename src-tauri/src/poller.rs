@@ -37,6 +37,11 @@ pub fn spawn(app: AppHandle, state: SharedState, client: GitHubClient) {
                 client.set_token(None);
             }
 
+            // Signal the start of a poll cycle so the UI can show a loading
+            // state and the tray can switch to the refreshing icon.
+            let _ = app.emit("poll:started", &Utc::now().to_rfc3339());
+            tray::set_refreshing(&app);
+
             // Snapshot intent: write auth, attempt poll, then write everything.
             let mut next_interval = POLL_IDLE;
             if client.has_token() {
@@ -84,6 +89,9 @@ pub fn spawn(app: AppHandle, state: SharedState, client: GitHubClient) {
                                 "at": Utc::now().to_rfc3339(),
                             }),
                         );
+                        // Restore the tray icon to the last-known aggregate so
+                        // the refreshing indicator doesn't persist.
+                        tray::update_icon(&app, state.snapshot.read().aggregate);
                         backoff = next_backoff(backoff);
                         next_interval = backoff;
                     }

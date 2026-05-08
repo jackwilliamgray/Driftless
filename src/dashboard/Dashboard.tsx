@@ -7,7 +7,7 @@ import type {
   WatchedRepoState,
 } from "../lib/types";
 import { getSnapshot, forceRefresh } from "../lib/invoke";
-import { onSnapshot, onPollError } from "../lib/events";
+import { onSnapshot, onPollError, onPollStarted } from "../lib/events";
 import { PRCard, WatchedCard } from "./RepoCard";
 import { Settings } from "./Settings";
 import { projectForRepo } from "../lib/projects";
@@ -26,6 +26,12 @@ export function Dashboard() {
   const [pollError, setPollError] = useState<PollError | null>(null);
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultPrefs);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    forceRefresh();
+  };
 
   const toggleCollapsed = (key: string) => {
     setCollapsedProjects((prev) => {
@@ -48,15 +54,26 @@ export function Dashboard() {
       if (list) list.push(w);
       else buckets.set(key, [w]);
     }
+    const lastRunAt = (w: WatchedRepoState) =>
+      w.recent_runs.reduce((m, r) => Math.max(m, Date.parse(r.updated_at) || 0), 0);
+    const sortRepos = (repos: WatchedRepoState[]) =>
+      repos.slice().sort((a, b) => {
+        const at = lastRunAt(a);
+        const bt = lastRunAt(b);
+        if (at !== bt) return bt - at;
+        const an = `${a.repo.owner}/${a.repo.name}`.toLowerCase();
+        const bn = `${b.repo.owner}/${b.repo.name}`.toLowerCase();
+        return an.localeCompare(bn);
+      });
     const ordered: { key: string; project: Project | null; repos: WatchedRepoState[] }[] = [];
     for (const p of projects) {
       if (!p.enabled) continue;
       const repos = buckets.get(p.id);
-      if (repos) ordered.push({ key: p.id, project: p, repos });
+      if (repos) ordered.push({ key: p.id, project: p, repos: sortRepos(repos) });
     }
     const ungrouped = buckets.get("__ungrouped__");
     if (ungrouped) {
-      ordered.push({ key: "__ungrouped__", project: null, repos: ungrouped });
+      ordered.push({ key: "__ungrouped__", project: null, repos: sortRepos(ungrouped) });
     }
     return ordered;
   }, [snapshot]);
@@ -74,13 +91,23 @@ export function Dashboard() {
     document.body.classList.add("dashboard");
     let mounted = true;
     getSnapshot().then((s) => mounted && setSnapshot(s)).catch(() => {});
-    const offSnap = onSnapshot((s) => mounted && setSnapshot(s));
-    const offErr = onPollError((e) => mounted && setPollError(e));
+    const offSnap = onSnapshot((s) => {
+      if (!mounted) return;
+      setSnapshot(s);
+      setIsRefreshing(false);
+    });
+    const offErr = onPollError((e) => {
+      if (!mounted) return;
+      setPollError(e);
+      setIsRefreshing(false);
+    });
+    const offStarted = onPollStarted(() => mounted && setIsRefreshing(true));
     return () => {
       mounted = false;
       document.body.classList.remove("dashboard");
       offSnap.then((fn) => fn());
       offErr.then((fn) => fn());
+      offStarted.then((fn) => fn());
     };
   }, []);
 
@@ -100,7 +127,14 @@ export function Dashboard() {
           </button>
         </nav>
         <div style={{ marginTop: "auto", paddingTop: 12 }}>
-          <button onClick={() => forceRefresh()} style={{ padding: "6px 10px" }}>Refresh now</button>
+          <button
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            className={isRefreshing ? "is-refreshing" : ""}
+            style={{ padding: "6px 10px" }}
+          >
+            {isRefreshing ? "Refreshing…" : "Refresh now"}
+          </button>
           {snapshot?.last_polled_at && (
             <div style={{ fontSize: 11, color: "var(--fg-muted)", padding: "8px 10px" }}>
               Last polled {new Date(snapshot.last_polled_at).toLocaleTimeString()}
@@ -124,7 +158,9 @@ export function Dashboard() {
               Open a terminal and run <code>gh auth login</code>, then click Refresh.
             </p>
             {snapshot.auth.error && <p style={{ color: "#ef4444" }}>{snapshot.auth.error}</p>}
-            <button className="btn-primary" onClick={() => forceRefresh()}>Refresh</button>
+            <button className="btn-primary" onClick={handleRefresh} disabled={isRefreshing}>
+              {isRefreshing ? "Refreshing…" : "Refresh"}
+            </button>
           </div>
         )}
         {snapshot && snapshot.auth.logged_in && view === "prs" && (

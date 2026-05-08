@@ -13,6 +13,9 @@ const ICON_IDLE: &[u8] = include_bytes!("../icons/tray-idle.png");
 const ICON_PENDING: &[u8] = include_bytes!("../icons/tray-pending.png");
 const ICON_SUCCESS: &[u8] = include_bytes!("../icons/tray-success.png");
 const ICON_FAILURE: &[u8] = include_bytes!("../icons/tray-failure.png");
+// Reuses the pending icon as the universal "working" indicator while a
+// poll cycle is in flight, regardless of the last aggregate state.
+const ICON_REFRESHING: &[u8] = ICON_PENDING;
 
 pub fn install(app: &AppHandle) -> tauri::Result<()> {
     let show_dashboard = MenuItem::with_id(
@@ -97,6 +100,14 @@ pub fn update_icon(app: &AppHandle, aggregate: AggregateState) {
         AggregateState::Success => ICON_SUCCESS,
         AggregateState::Failure => ICON_FAILURE,
     };
+    set_icon_bytes(app, bytes, format!("{aggregate:?}"));
+}
+
+pub fn set_refreshing(app: &AppHandle) {
+    set_icon_bytes(app, ICON_REFRESHING, "refreshing".into());
+}
+
+fn set_icon_bytes(app: &AppHandle, bytes: &[u8], label: String) {
     let icon = match Image::from_bytes(bytes) {
         Ok(i) => i,
         Err(e) => {
@@ -108,7 +119,7 @@ pub fn update_icon(app: &AppHandle, aggregate: AggregateState) {
         if let Err(e) = tray.set_icon(Some(icon)) {
             warn!(error = %e, "failed to update tray icon");
         } else {
-            debug!(?aggregate, "tray icon updated");
+            debug!(state = %label, "tray icon updated");
         }
     }
 }

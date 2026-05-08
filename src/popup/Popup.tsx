@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import type { AppSnapshot } from "../lib/types";
 import { getSnapshot, openInBrowser, showDashboard, forceRefresh, hidePopup } from "../lib/invoke";
-import { onSnapshot, onAuthChanged } from "../lib/events";
+import { onSnapshot, onAuthChanged, onPollStarted, onPollError } from "../lib/events";
 import { StatusIcon } from "../components/StatusIcon";
 import { RunRow } from "./RunRow";
 
 export function Popup() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -14,19 +15,32 @@ export function Popup() {
       .then((s) => mounted && setSnapshot(s))
       .catch(() => {});
 
-    const offSnap = onSnapshot((s) => mounted && setSnapshot(s));
+    const offSnap = onSnapshot((s) => {
+      if (!mounted) return;
+      setSnapshot(s);
+      setIsRefreshing(false);
+    });
     const offAuth = onAuthChanged(() => {
       getSnapshot()
         .then((s) => mounted && setSnapshot(s))
         .catch(() => {});
     });
+    const offStarted = onPollStarted(() => mounted && setIsRefreshing(true));
+    const offErr = onPollError(() => mounted && setIsRefreshing(false));
 
     return () => {
       mounted = false;
       offSnap.then((fn) => fn());
       offAuth.then((fn) => fn());
+      offStarted.then((fn) => fn());
+      offErr.then((fn) => fn());
     };
   }, []);
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    forceRefresh();
+  };
 
   if (!snapshot) {
     return (
@@ -45,7 +59,9 @@ export function Popup() {
           <p style={{ color: "var(--fg-muted)", fontSize: 12 }}>
             Run <code>gh auth login</code> in your terminal, then click refresh.
           </p>
-          <button className="btn-primary" onClick={() => forceRefresh()}>Retry</button>
+          <button className="btn-primary" onClick={handleRefresh} disabled={isRefreshing}>
+            {isRefreshing ? "Refreshing…" : "Retry"}
+          </button>
         </div>
         <div className="popup-footer">
           <button onClick={() => showDashboard()}>Settings…</button>
@@ -123,7 +139,9 @@ export function Popup() {
 
       <div className="popup-footer">
         <button onClick={() => { showDashboard(); hidePopup(); }}>Open dashboard…</button>
-        <button onClick={() => forceRefresh()}>Refresh</button>
+        <button onClick={handleRefresh} disabled={isRefreshing} className={isRefreshing ? "is-refreshing" : ""}>
+          {isRefreshing ? "Refreshing…" : "Refresh"}
+        </button>
       </div>
     </div>
   );

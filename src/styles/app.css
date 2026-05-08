@@ -121,6 +121,14 @@ button {
 .status-icon.status-pending svg { animation: spin 1.4s linear infinite; transform-origin: center; }
 .spin-half { stroke-dashoffset: 0; }
 
+/* ---------- Refreshing button state ---------- */
+@keyframes refresh-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+button:disabled { cursor: progress; }
+button.is-refreshing { animation: refresh-pulse 1.2s ease-in-out infinite; }
+
 /* ---------- Dashboard ---------- */
 body.dashboard { background: var(--bg-elev); }
 .dashboard-root { display: flex; height: 100vh; min-height: 0; }
