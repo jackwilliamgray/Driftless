@@ -35,6 +35,8 @@ pub struct AppSnapshot {
     pub global_excluded_workflows: Vec<String>,
     #[serde(default)]
     pub projects: Vec<Project>,
+    #[serde(default)]
+    pub debug_logging: bool,
 }
 
 impl Default for AppSnapshot {
@@ -49,6 +51,7 @@ impl Default for AppSnapshot {
             rate_limit_remaining: None,
             global_excluded_workflows: Vec::new(),
             projects: Vec::new(),
+            debug_logging: false,
         }
     }
 }
@@ -110,6 +113,8 @@ pub struct PersistedConfig {
     pub global_excluded_workflows: Vec<String>,
     #[serde(default)]
     pub projects: Vec<Project>,
+    #[serde(default)]
+    pub debug_logging: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -1,6 +1,7 @@
 mod auth;
 mod commands;
 mod github;
+mod logging;
 mod notify;
 mod poller;
 mod scan;
@@ -12,22 +13,12 @@ use std::sync::Arc;
 use tauri::Manager;
 use tauri_plugin_autostart::MacosLauncher;
 use tracing::info;
-use tracing_subscriber::EnvFilter;
 
 use crate::github::GitHubClient;
 use crate::state::{AppState, SharedState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_env("DRIFTLESS_LOG").unwrap_or_else(|_| {
-                EnvFilter::new("info,driftless_lib=debug")
-            }),
-        )
-        .with_target(false)
-        .try_init();
-
     let shared: SharedState = Arc::new(AppState::new());
 
     tauri::Builder::default()
@@ -64,6 +55,8 @@ pub fn run() {
             commands::remove_project,
             commands::set_project_enabled,
             commands::set_project_members,
+            commands::set_debug_logging,
+            commands::open_logs_folder,
         ])
         .setup(move |app| {
             // macOS: hide dock icon, run as menu-bar accessory.
@@ -73,18 +66,35 @@ pub fn run() {
             }
 
             // Hydrate persisted config & last-known run conclusions.
-            match store::load_config(&app.handle()) {
-                Ok(cfg) => {
-                    {
-                        let mut snap = shared.snapshot.write();
-                        snap.global_excluded_workflows = cfg.global_excluded_workflows.clone();
-                        snap.projects = cfg.projects.clone();
-                    }
-                    *shared.config.write() = cfg;
-                }
+            let loaded_cfg = match store::load_config(&app.handle()) {
+                Ok(cfg) => Some(cfg),
                 Err(e) => {
-                    tracing::warn!(error = %e, "failed to load persisted config; using defaults");
+                    eprintln!("failed to load persisted config; using defaults: {e}");
+                    None
                 }
+            };
+            let debug_logging = loaded_cfg
+                .as_ref()
+                .map(|c| c.debug_logging)
+                .unwrap_or(false);
+
+            // Initialize tracing now that we know whether debug logging is on.
+            // Done before any logging-producing setup so panics/errors during
+            // the rest of bring-up are captured to the log file when enabled.
+            if let Ok(dir) = logging::log_dir(&app.handle()) {
+                logging::init(&dir, debug_logging);
+            } else {
+                logging::init(std::path::Path::new("."), debug_logging);
+            }
+
+            if let Some(cfg) = loaded_cfg {
+                {
+                    let mut snap = shared.snapshot.write();
+                    snap.global_excluded_workflows = cfg.global_excluded_workflows.clone();
+                    snap.projects = cfg.projects.clone();
+                    snap.debug_logging = cfg.debug_logging;
+                }
+                *shared.config.write() = cfg;
             }
             *shared.last_run_conclusions.write() =
                 store::load_last_run_conclusions(&app.handle());

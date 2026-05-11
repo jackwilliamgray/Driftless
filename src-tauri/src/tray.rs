@@ -1,9 +1,9 @@
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, PhysicalPosition};
 use tauri_plugin_positioner::{Position, WindowExt};
-use tracing::{debug, warn};
+use tracing::{debug, info, warn};
 
 use crate::state::AggregateState;
 
@@ -55,42 +55,77 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
         })
         .on_tray_icon_event(|tray, event| {
             let app = tray.app_handle();
+            // Forward to positioner first so its rect cache is current before
+            // we ask it to position the popup. Suspected source of intermittent
+            // multi-monitor crashes — log generously so any panic from inside
+            // the plugin leaves a breadcrumb in the log file.
+            debug!(?event, "tray event");
+            tauri_plugin_positioner::on_tray_event(app, &event);
+
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
                 button_state: MouseButtonState::Up,
+                position,
+                rect,
                 ..
-            } = event
+            } = &event
             {
-                toggle_popup(app);
+                info!(
+                    click_x = position.x,
+                    click_y = position.y,
+                    rect = ?rect,
+                    "tray left-click"
+                );
+                toggle_popup(app, *position);
             }
-            if let TrayIconEvent::DoubleClick { .. } = event {
+            if let TrayIconEvent::DoubleClick { .. } = &event {
+                debug!("tray double-click → opening dashboard");
                 if let Some(w) = app.get_webview_window("dashboard") {
                     let _ = w.show();
                     let _ = w.set_focus();
                 }
             }
-            // Forward to positioner so it can track the icon location.
-            tauri_plugin_positioner::on_tray_event(app, &event);
         })
         .build(app)?;
 
     Ok(())
 }
 
-fn toggle_popup(app: &AppHandle) {
+fn toggle_popup(app: &AppHandle, click_pos: PhysicalPosition<f64>) {
     let Some(window) = app.get_webview_window("tray-popup") else {
         warn!("no tray-popup window registered");
         return;
     };
-    if window.is_visible().unwrap_or(false) {
-        let _ = window.hide();
-        return;
+    match window.is_visible() {
+        Ok(true) => {
+            debug!("popup visible → hiding");
+            if let Err(e) = window.hide() {
+                warn!(error = %e, "failed to hide popup");
+            }
+            return;
+        }
+        Ok(false) => debug!("popup hidden → positioning & showing"),
+        Err(e) => warn!(error = %e, "is_visible() failed; assuming hidden"),
+    }
+    // Seed the popup onto the tray's monitor before asking the positioner
+    // plugin to compute TrayCenter. tauri-plugin-positioner unconditionally
+    // calls `window.current_monitor()?.unwrap()`, which panics for a hidden
+    // window that has no monitor binding — e.g. when the tray click happens
+    // on a different display than the popup was last shown on.
+    let seed = PhysicalPosition::new(click_pos.x as i32, click_pos.y as i32);
+    if let Err(e) = window.set_position(seed) {
+        warn!(error = %e, "failed to seed popup position");
     }
     if let Err(e) = window.move_window(Position::TrayCenter) {
         warn!(error = %e, "failed to position popup");
     }
-    let _ = window.show();
-    let _ = window.set_focus();
+    if let Err(e) = window.show() {
+        warn!(error = %e, "failed to show popup");
+        return;
+    }
+    if let Err(e) = window.set_focus() {
+        warn!(error = %e, "failed to focus popup");
+    }
 }
 
 pub fn update_icon(app: &AppHandle, aggregate: AggregateState) {

@@ -71,6 +71,7 @@ export interface AppSnapshot {
   rate_limit_remaining: number | null;
   global_excluded_workflows: string[];
   projects: Project[];
+  debug_logging: boolean;
 }
 
 export interface ProjectRepoRef {

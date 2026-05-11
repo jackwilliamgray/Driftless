@@ -24,6 +24,8 @@ import {
   removeProject,
   setProjectEnabled,
   setProjectMembers,
+  setDebugLogging as setDebugLoggingCmd,
+  openLogsFolder,
 } from "../lib/invoke";
 import { repoInProject } from "../lib/projects";
 
@@ -58,6 +60,32 @@ export function Settings({ snapshot, prefs, onPrefsChange }: SettingsProps) {
   const [excludeError, setExcludeError] = useState<string | null>(null);
   const [launchAtLogin, setLaunchAtLogin] = useState<boolean | null>(null);
   const [launchAtLoginError, setLaunchAtLoginError] = useState<string | null>(null);
+  const [debugLogging, setDebugLogging] = useState<boolean>(snapshot.debug_logging ?? false);
+  const [debugLoggingError, setDebugLoggingError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setDebugLogging(snapshot.debug_logging ?? false);
+  }, [snapshot.debug_logging]);
+
+  const onToggleDebugLogging = async (next: boolean) => {
+    setDebugLoggingError(null);
+    setDebugLogging(next);
+    try {
+      await setDebugLoggingCmd(next);
+    } catch (e) {
+      setDebugLogging(!next);
+      setDebugLoggingError(String(e));
+    }
+  };
+
+  const onOpenLogsFolder = async () => {
+    setDebugLoggingError(null);
+    try {
+      await openLogsFolder();
+    } catch (e) {
+      setDebugLoggingError(String(e));
+    }
+  };
 
   useEffect(() => {
     isAutostartEnabled()
@@ -716,6 +744,29 @@ export function Settings({ snapshot, prefs, onPrefsChange }: SettingsProps) {
           {launchAtLoginError}
         </div>
       )}
+
+      <h3 style={{ marginTop: 24 }}>Debug logging</h3>
+      <div style={{ color: "var(--fg-muted)", fontSize: 12, marginBottom: 8 }}>
+        Writes verbose logs and any crashes/panics to a file in the app log
+        folder. Toggle takes effect on next launch.
+      </div>
+      <label>
+        <input
+          type="checkbox"
+          checked={debugLogging}
+          onChange={(e) => onToggleDebugLogging(e.target.checked)}
+        />
+        Enable debug logging
+      </label>
+      <div style={{ marginTop: 8 }}>
+        <button onClick={onOpenLogsFolder}>Open logs folder</button>
+      </div>
+      {debugLoggingError && (
+        <div style={{ color: "#ef4444", fontSize: 12, marginTop: 4 }}>
+          {debugLoggingError}
+        </div>
+      )}
+
       <div style={{ marginTop: 12 }}>
         <button onClick={() => quitApp()}>Quit Driftless</button>
       </div>

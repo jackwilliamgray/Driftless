@@ -7,6 +7,7 @@ use crate::auth;
 use crate::github::rest;
 use crate::github::types::{RepoRef, WorkflowJob};
 use crate::github::GitHubClient;
+use crate::logging;
 use crate::scan::{self, DiscoveredRepo};
 use crate::state::{
     merge_aggregates, AppSnapshot, AuthStatus, NotificationPrefs, Project, ProjectRepoRef,
@@ -301,6 +302,32 @@ pub fn hide_popup(app: AppHandle) {
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
     app.exit(0);
+}
+
+#[tauri::command]
+pub async fn set_debug_logging(
+    enabled: bool,
+    app: AppHandle,
+    state: State<'_, SharedState>,
+) -> Result<(), String> {
+    {
+        let mut cfg = state.config.write();
+        store::set_debug_logging(&mut cfg, enabled);
+        store::save_config(&app, &cfg).map_err(|e| format!("{e}"))?;
+    }
+    state.snapshot.write().debug_logging = enabled;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn open_logs_folder(app: AppHandle) -> Result<(), String> {
+    let dir = logging::log_dir(&app).map_err(|e| format!("{e}"))?;
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        return Err(format!("failed to create log dir: {e}"));
+    }
+    app.opener()
+        .open_path(dir.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|e| format!("{e}"))
 }
 
 fn snapshot_after_projects_change(state: &SharedState) -> AppSnapshot {

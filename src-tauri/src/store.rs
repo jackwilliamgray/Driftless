@@ -97,6 +97,11 @@ pub fn set_notification_prefs(config: &mut PersistedConfig, prefs: NotificationP
 }
 
 #[allow(dead_code)]
+pub fn set_debug_logging(config: &mut PersistedConfig, enabled: bool) {
+    config.debug_logging = enabled;
+}
+
+#[allow(dead_code)]
 pub fn set_global_excluded_workflows(config: &mut PersistedConfig, names: Vec<String>) {
     config.global_excluded_workflows = normalize_names(names);
 }

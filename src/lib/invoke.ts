@@ -49,3 +49,6 @@ export const setProjectEnabled = (id: string, enabled: boolean) =>
   invoke<Project[]>("set_project_enabled", { id, enabled });
 export const setProjectMembers = (id: string, members: ProjectRepoRef[]) =>
   invoke<Project[]>("set_project_members", { id, members });
+export const setDebugLogging = (enabled: boolean) =>
+  invoke<void>("set_debug_logging", { enabled });
+export const openLogsFolder = () => invoke<void>("open_logs_folder");
