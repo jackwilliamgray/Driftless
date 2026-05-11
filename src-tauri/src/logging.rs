@@ -39,7 +39,8 @@ pub fn init(log_dir: &Path, debug_logging: bool) {
         }
         match OpenOptions::new()
             .create(true)
-            .append(true)
+            .write(true)
+            .truncate(true)
             .open(&file_path)
         {
             Ok(f) => Some(Mutex::new(f)),
