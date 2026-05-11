@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { PullRequestSummary, WatchedRepoState } from "../lib/types";
 import { StatusIcon } from "../components/StatusIcon";
+import { ReviewIcon } from "../components/ReviewIcon";
 import { DismissButton } from "../components/DismissButton";
 import { openInBrowser } from "../lib/invoke";
 import { RunDetail } from "./RunDetail";
@@ -15,6 +16,7 @@ export function PRCard({ pr }: PRCardProps) {
         <button className="repo-name" onClick={() => openInBrowser(pr.url)}>
           {pr.repo.owner}/{pr.repo.name} #{pr.number}
         </button>
+        <ReviewIcon decision={pr.review_decision} size={14} />
         <span className="repo-meta">{pr.branch}{pr.is_draft ? " · draft" : ""}</span>
       </div>
       <div style={{ marginBottom: 6, color: "var(--fg-muted)" }}>{pr.title}</div>

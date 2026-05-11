@@ -13,6 +13,8 @@ export type RunConclusion =
 
 export type AggregateState = "idle" | "pending" | "success" | "failure";
 
+export type ReviewDecision = "APPROVED" | "CHANGES_REQUESTED" | "REVIEW_REQUIRED" | null;
+
 export interface AuthStatus {
   logged_in: boolean;
   login: string | null;
@@ -48,6 +50,7 @@ export interface PullRequestSummary {
   url: string;
   is_draft: boolean;
   state: "OPEN" | "CLOSED" | "MERGED";
+  review_decision: ReviewDecision;
   runs: WorkflowRun[];
   aggregate: AggregateState;
 }

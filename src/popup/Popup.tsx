@@ -3,6 +3,7 @@ import type { AppSnapshot } from "../lib/types";
 import { getSnapshot, openInBrowser, showDashboard, forceRefresh, hidePopup } from "../lib/invoke";
 import { onSnapshot, onAuthChanged, onPollStarted, onPollError } from "../lib/events";
 import { StatusIcon } from "../components/StatusIcon";
+import { ReviewIcon } from "../components/ReviewIcon";
 import { DismissButton } from "../components/DismissButton";
 import { RunRow } from "./RunRow";
 
@@ -98,7 +99,9 @@ export function Popup() {
             >
               <StatusIcon aggregate={pr.aggregate} />
               <span className="name">
-                {pr.repo.owner}/{pr.repo.name} <span style={{ color: "var(--fg-muted)" }}>#{pr.number}</span>
+                {pr.repo.owner}/{pr.repo.name}{" "}
+                <span style={{ color: "var(--fg-muted)" }}>#{pr.number}</span>{" "}
+                <ReviewIcon decision={pr.review_decision} />
               </span>
             </button>
             {pr.runs.length > 0 && (

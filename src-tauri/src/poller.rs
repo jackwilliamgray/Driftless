@@ -175,6 +175,7 @@ async fn poll_once(
             url: pr.url.clone(),
             is_draft: pr.is_draft,
             state: pr.state.clone(),
+            review_decision: pr.review_decision.clone(),
             runs,
             aggregate: agg,
         });
@@ -231,6 +232,7 @@ async fn poll_once(
                 url: c.url,
                 is_draft: c.is_draft,
                 state: c.state,
+                review_decision: None,
                 runs,
                 aggregate: agg,
             });

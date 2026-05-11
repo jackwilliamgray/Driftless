@@ -14,6 +14,7 @@ query ViewerPRs($first: Int!) {
         url
         isDraft
         state
+        reviewDecision
         headRefName
         headRefOid
         repository { owner { login } name }
@@ -47,6 +48,8 @@ struct PrNode {
     #[serde(rename = "isDraft")]
     is_draft: bool,
     state: String,
+    #[serde(rename = "reviewDecision")]
+    review_decision: Option<String>,
     #[serde(rename = "headRefName")]
     head_ref_name: String,
     #[serde(rename = "headRefOid")]
@@ -73,6 +76,7 @@ pub struct ViewerPullRequest {
     pub url: String,
     pub is_draft: bool,
     pub state: String,
+    pub review_decision: Option<String>,
     pub branch: String,
     pub head_sha: String,
 }
@@ -98,6 +102,7 @@ pub async fn viewer_open_prs(client: &GitHubClient) -> Result<Vec<ViewerPullRequ
             url: n.url,
             is_draft: n.is_draft,
             state: n.state,
+            review_decision: n.review_decision,
             branch: n.head_ref_name,
             head_sha: n.head_ref_oid,
         })

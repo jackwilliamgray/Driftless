@@ -34,6 +34,8 @@ pub struct PullRequestSummary {
     pub url: String,
     pub is_draft: bool,
     pub state: String,
+    #[serde(default)]
+    pub review_decision: Option<String>,
     pub runs: Vec<WorkflowRun>,
     pub aggregate: AggregateState,
 }
