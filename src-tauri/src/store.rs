@@ -61,8 +61,28 @@ pub fn upsert_watched(config: &mut PersistedConfig, w: WatchedRepoConfig) {
         if !w.excluded_workflows.is_empty() {
             slot.excluded_workflows = w.excluded_workflows;
         }
+        // Dismissal is a poll-driven flag; never overwritten via upsert.
     } else {
         config.watched.push(w);
+    }
+}
+
+#[allow(dead_code)]
+pub fn set_repo_dismissed_until(
+    config: &mut PersistedConfig,
+    owner: &str,
+    name: &str,
+    until: Option<u64>,
+) -> bool {
+    if let Some(slot) = config
+        .watched
+        .iter_mut()
+        .find(|w| w.owner == owner && w.name == name)
+    {
+        slot.dismissed_until_run_id = until;
+        true
+    } else {
+        false
     }
 }
 

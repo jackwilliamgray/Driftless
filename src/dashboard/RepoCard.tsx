@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { PullRequestSummary, WatchedRepoState } from "../lib/types";
 import { StatusIcon } from "../components/StatusIcon";
+import { DismissButton } from "../components/DismissButton";
 import { openInBrowser } from "../lib/invoke";
 import { RunDetail } from "./RunDetail";
 
@@ -37,16 +38,21 @@ export function PRCard({ pr }: PRCardProps) {
 interface WatchedCardProps { watched: WatchedRepoState; }
 export function WatchedCard({ watched }: WatchedCardProps) {
   const [openRun, setOpenRun] = useState<number | null>(null);
+  const canDismiss = watched.aggregate === "failure";
+  const showDismiss = canDismiss || watched.dismissed;
   return (
-    <div className="repo-card">
+    <div className={`repo-card${watched.dismissed ? " is-dismissed" : ""}`}>
       <div className="repo-card-header">
-        <StatusIcon aggregate={watched.aggregate} />
+        <StatusIcon aggregate={watched.aggregate} dismissed={watched.dismissed} />
         <button
           className="repo-name"
           onClick={() => openInBrowser(`https://github.com/${watched.repo.owner}/${watched.repo.name}/actions`)}
         >
           {watched.repo.owner}/{watched.repo.name}
         </button>
+        {showDismiss && (
+          <DismissButton repo={watched.repo} dismissed={watched.dismissed} />
+        )}
         {watched.branch_filter && (
           <span className="repo-meta">branch: {watched.branch_filter}</span>
         )}

@@ -99,6 +99,31 @@ button {
 }
 .popup-row:hover { background: var(--hover); }
 .popup-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popup-row-wrap {
+  display: flex;
+  align-items: center;
+  padding-right: 8px;
+}
+.popup-row-wrap .popup-row { padding-right: 4px; }
+.popup-row-wrap:hover { background: var(--hover); }
+.popup-row-wrap:hover .popup-row { background: transparent; }
+.popup-row-wrap.is-dismissed .popup-row .name { color: var(--fg-muted); }
+
+.dismiss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--fg-muted);
+  flex: 0 0 auto;
+  opacity: 0.7;
+  transition: opacity 80ms ease, background-color 80ms ease, color 80ms ease;
+}
+.dismiss-btn:hover { opacity: 1; background: var(--hover); color: var(--fg); }
+.dismiss-btn.is-dismissed { color: #22c55e; opacity: 0.9; }
+.dismiss-btn.is-dismissed:hover { color: #16a34a; opacity: 1; }
 .popup-row .runs {
   display: inline-flex; gap: 4px; flex-wrap: nowrap;
 }
@@ -164,8 +189,10 @@ body.dashboard { background: var(--bg-elev); }
   background: var(--bg-elev);
 }
 .repo-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.repo-card-header .repo-name { font-weight: 600; flex: 1; }
+.repo-card-header .repo-name { font-weight: 600; flex: 1; text-align: left; }
 .repo-card-header .repo-meta { color: var(--fg-muted); font-size: 11px; }
+.repo-card.is-dismissed { opacity: 0.72; }
+.repo-card.is-dismissed .repo-name { color: var(--fg-muted); font-weight: 500; }
 
 .run-row {
   display: flex; align-items: center; gap: 8px;

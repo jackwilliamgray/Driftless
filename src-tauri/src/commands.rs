@@ -9,10 +9,11 @@ use crate::github::types::{RepoRef, WorkflowJob};
 use crate::github::GitHubClient;
 use crate::scan::{self, DiscoveredRepo};
 use crate::state::{
-    AppSnapshot, AuthStatus, NotificationPrefs, Project, ProjectRepoRef, SharedState,
-    WatchedRepoConfig,
+    merge_aggregates, AppSnapshot, AuthStatus, NotificationPrefs, Project, ProjectRepoRef,
+    SharedState, WatchedRepoConfig,
 };
 use crate::store;
+use crate::tray;
 
 #[tauri::command]
 pub async fn auth_status() -> AuthStatus {
@@ -52,6 +53,7 @@ pub async fn add_watched_repo(
                 name,
                 branch_filter,
                 excluded_workflows: Vec::new(),
+                dismissed_until_run_id: None,
             },
         );
         store::save_config(&app, &cfg).map_err(|e| format!("{e}"))?;
@@ -188,6 +190,85 @@ pub async fn set_repo_excluded_workflows(
     }
     state.wakeup.notify_one();
     Ok(updated)
+}
+
+#[tauri::command]
+pub async fn dismiss_watched_repo(
+    owner: String,
+    name: String,
+    app: AppHandle,
+    state: State<'_, SharedState>,
+) -> Result<(), String> {
+    // Use the latest known run id from the snapshot as the high-water mark.
+    // Anything with id <= this is considered acknowledged; the next poll that
+    // surfaces a higher id clears the dismissal.
+    let max_id = {
+        let snap = state.snapshot.read();
+        snap.watched
+            .iter()
+            .find(|w| w.repo.owner == owner && w.repo.name == name)
+            .map(|w| w.recent_runs.iter().map(|r| r.id).max().unwrap_or(0))
+            .unwrap_or(0)
+    };
+    {
+        let mut cfg = state.config.write();
+        if !store::set_repo_dismissed_until(&mut cfg, &owner, &name, Some(max_id)) {
+            return Err(format!("repo {owner}/{name} is not in the watched list"));
+        }
+        store::save_config(&app, &cfg).map_err(|e| format!("{e}"))?;
+    }
+    update_dismissed_and_emit(&app, &state, &owner, &name, true);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn undismiss_watched_repo(
+    owner: String,
+    name: String,
+    app: AppHandle,
+    state: State<'_, SharedState>,
+) -> Result<(), String> {
+    {
+        let mut cfg = state.config.write();
+        if !store::set_repo_dismissed_until(&mut cfg, &owner, &name, None) {
+            return Err(format!("repo {owner}/{name} is not in the watched list"));
+        }
+        store::save_config(&app, &cfg).map_err(|e| format!("{e}"))?;
+    }
+    update_dismissed_and_emit(&app, &state, &owner, &name, false);
+    Ok(())
+}
+
+fn update_dismissed_and_emit(
+    app: &AppHandle,
+    state: &SharedState,
+    owner: &str,
+    name: &str,
+    dismissed: bool,
+) {
+    let snap = {
+        let mut s = state.snapshot.write();
+        if let Some(slot) = s
+            .watched
+            .iter_mut()
+            .find(|w| w.repo.owner == owner && w.repo.name == name)
+        {
+            slot.dismissed = dismissed;
+        }
+        // Recompute the overall aggregate so the tray icon reflects the change
+        // immediately, without waiting for the next poll cycle.
+        let pr_aggs = s.prs.iter().map(|p| p.aggregate).collect::<Vec<_>>();
+        let watched_aggs = s
+            .watched
+            .iter()
+            .filter(|w| !w.dismissed)
+            .map(|w| w.aggregate)
+            .collect::<Vec<_>>();
+        s.aggregate = merge_aggregates(pr_aggs.into_iter().chain(watched_aggs));
+        s.clone()
+    };
+    let _ = app.emit("runs:updated", &snap);
+    tray::update_icon(app, snap.aggregate);
 }
 
 #[tauri::command]

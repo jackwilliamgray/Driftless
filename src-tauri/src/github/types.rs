@@ -46,6 +46,8 @@ pub struct WatchedRepoState {
     pub aggregate: AggregateState,
     #[serde(default)]
     pub excluded_workflows: Vec<String>,
+    #[serde(default)]
+    pub dismissed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

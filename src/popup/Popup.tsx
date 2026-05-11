@@ -3,6 +3,7 @@ import type { AppSnapshot } from "../lib/types";
 import { getSnapshot, openInBrowser, showDashboard, forceRefresh, hidePopup } from "../lib/invoke";
 import { onSnapshot, onAuthChanged, onPollStarted, onPollError } from "../lib/events";
 import { StatusIcon } from "../components/StatusIcon";
+import { DismissButton } from "../components/DismissButton";
 import { RunRow } from "./RunRow";
 
 export function Popup() {
@@ -118,23 +119,34 @@ export function Popup() {
             None yet. Add repos in Settings…
           </div>
         )}
-        {sortedWatched.map((w) => (
-          <button
-            key={`${w.repo.owner}/${w.repo.name}`}
-            className="popup-row"
-            onClick={() =>
-              openInBrowser(`https://github.com/${w.repo.owner}/${w.repo.name}/actions`)
-            }
-          >
-            <StatusIcon aggregate={w.aggregate} />
-            <span className="name">
-              {w.repo.owner}/{w.repo.name}
-              {w.branch_filter && (
-                <span style={{ color: "var(--fg-muted)" }}> ({w.branch_filter})</span>
+        {sortedWatched.map((w) => {
+          const canDismiss = w.aggregate === "failure";
+          const showButton = canDismiss || w.dismissed;
+          return (
+            <div
+              key={`${w.repo.owner}/${w.repo.name}`}
+              className={`popup-row-wrap${w.dismissed ? " is-dismissed" : ""}`}
+            >
+              <button
+                className="popup-row"
+                onClick={() =>
+                  openInBrowser(`https://github.com/${w.repo.owner}/${w.repo.name}/actions`)
+                }
+              >
+                <StatusIcon aggregate={w.aggregate} dismissed={w.dismissed} />
+                <span className="name">
+                  {w.repo.owner}/{w.repo.name}
+                  {w.branch_filter && (
+                    <span style={{ color: "var(--fg-muted)" }}> ({w.branch_filter})</span>
+                  )}
+                </span>
+              </button>
+              {showButton && (
+                <DismissButton repo={w.repo} dismissed={w.dismissed} />
               )}
-            </span>
-          </button>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       <div className="popup-footer">

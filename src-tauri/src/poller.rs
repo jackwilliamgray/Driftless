@@ -10,6 +10,7 @@ use crate::github::client::FetchOutcome;
 use crate::github::{graphql, rest, types::*, GitHubClient};
 use crate::notify::{dispatch_transitions, PollSnapshot};
 use crate::state::{aggregate_runs, merge_aggregates, AggregateState, SharedState};
+use crate::store;
 use crate::tray;
 
 const POLL_ACTIVE: Duration = Duration::from_secs(15);
@@ -45,7 +46,7 @@ pub fn spawn(app: AppHandle, state: SharedState, client: GitHubClient) {
             // Snapshot intent: write auth, attempt poll, then write everything.
             let mut next_interval = POLL_IDLE;
             if client.has_token() {
-                match poll_once(&client, &state).await {
+                match poll_once(&app, &client, &state).await {
                     Ok(snapshot) => {
                         backoff = Duration::from_secs(0);
                         // Run transition diff for notifications before the new
@@ -145,7 +146,11 @@ struct PollResult {
     global_excluded_workflows: Vec<String>,
 }
 
-async fn poll_once(client: &GitHubClient, state: &SharedState) -> Result<PollResult> {
+async fn poll_once(
+    app: &AppHandle,
+    client: &GitHubClient,
+    state: &SharedState,
+) -> Result<PollResult> {
     let global_excluded = state.config.read().global_excluded_workflows.clone();
 
     // 1. Open PRs from viewer.
@@ -235,6 +240,7 @@ async fn poll_once(client: &GitHubClient, state: &SharedState) -> Result<PollRes
     // 3. Watched repos.
     let watched_cfg = state.config.read().watched.clone();
     let mut watched = Vec::new();
+    let mut cleared_dismissals: Vec<(String, String)> = Vec::new();
     for w in watched_cfg {
         let runs = match rest::list_repo_runs(
             client,
@@ -258,6 +264,19 @@ async fn poll_once(client: &GitHubClient, state: &SharedState) -> Result<PollRes
             }
         };
         let agg = aggregate_runs(runs.iter());
+        // Clear dismissal as soon as a new run appears (id > dismissed_until).
+        let dismissed = match w.dismissed_until_run_id {
+            Some(until) => {
+                let any_newer = runs.iter().any(|r| r.id > until);
+                if any_newer {
+                    cleared_dismissals.push((w.owner.clone(), w.name.clone()));
+                    false
+                } else {
+                    true
+                }
+            }
+            None => false,
+        };
         watched.push(WatchedRepoState {
             repo: RepoRef {
                 owner: w.owner,
@@ -267,13 +286,38 @@ async fn poll_once(client: &GitHubClient, state: &SharedState) -> Result<PollRes
             recent_runs: runs,
             aggregate: agg,
             excluded_workflows: w.excluded_workflows,
+            dismissed,
         });
+    }
+
+    if !cleared_dismissals.is_empty() {
+        let cfg_snapshot = {
+            let mut cfg = state.config.write();
+            for (owner, name) in &cleared_dismissals {
+                if let Some(slot) = cfg
+                    .watched
+                    .iter_mut()
+                    .find(|w| &w.owner == owner && &w.name == name)
+                {
+                    slot.dismissed_until_run_id = None;
+                }
+            }
+            cfg.clone()
+        };
+        if let Err(e) = store::save_config(app, &cfg_snapshot) {
+            warn!(error = %e, "failed to persist cleared dismissals");
+        }
     }
 
     let aggregate = merge_aggregates(
         prs.iter()
             .map(|p| p.aggregate)
-            .chain(watched.iter().map(|w| w.aggregate)),
+            .chain(
+                watched
+                    .iter()
+                    .filter(|w| !w.dismissed)
+                    .map(|w| w.aggregate),
+            ),
     );
 
     let rate_limit = state.snapshot.read().rate_limit_remaining;

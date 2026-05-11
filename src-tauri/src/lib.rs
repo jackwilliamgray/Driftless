@@ -53,6 +53,8 @@ pub fn run() {
             commands::set_notification_prefs,
             commands::set_global_excluded_workflows,
             commands::set_repo_excluded_workflows,
+            commands::dismiss_watched_repo,
+            commands::undismiss_watched_repo,
             commands::open_run_in_browser,
             commands::force_refresh,
             commands::show_dashboard,

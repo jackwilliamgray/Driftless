@@ -96,6 +96,10 @@ pub struct WatchedRepoConfig {
     pub branch_filter: Option<String>,
     #[serde(default)]
     pub excluded_workflows: Vec<String>,
+    /// If set, runs with id <= this value are considered acknowledged. As
+    /// soon as a poll surfaces a run with a higher id, the dismissal clears.
+    #[serde(default)]
+    pub dismissed_until_run_id: Option<u64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

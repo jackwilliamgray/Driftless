@@ -58,6 +58,7 @@ export interface WatchedRepoState {
   recent_runs: WorkflowRun[];
   aggregate: AggregateState;
   excluded_workflows: string[];
+  dismissed: boolean;
 }
 
 export interface AppSnapshot {

@@ -32,6 +32,10 @@ export const setRepoExcludedWorkflows = (
   name: string,
   names: string[],
 ) => invoke<string[]>("set_repo_excluded_workflows", { owner, name, names });
+export const dismissWatchedRepo = (owner: string, name: string) =>
+  invoke<void>("dismiss_watched_repo", { owner, name });
+export const undismissWatchedRepo = (owner: string, name: string) =>
+  invoke<void>("undismiss_watched_repo", { owner, name });
 export const openInBrowser = (url: string) => invoke<void>("open_run_in_browser", { url });
 export const forceRefresh = () => invoke<void>("force_refresh");
 export const showDashboard = () => invoke<void>("show_dashboard");
