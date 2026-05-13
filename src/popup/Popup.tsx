@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import type { AppSnapshot } from "../lib/types";
 import { getSnapshot, openInBrowser, showDashboard, forceRefresh, hidePopup } from "../lib/invoke";
 import { onSnapshot, onAuthChanged, onPollStarted, onPollError } from "../lib/events";
@@ -10,11 +11,15 @@ import { RunRow } from "./RunRow";
 export function Popup() {
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [version, setVersion] = useState<string>("");
 
   useEffect(() => {
     let mounted = true;
     getSnapshot()
       .then((s) => mounted && setSnapshot(s))
+      .catch(() => {});
+    getVersion()
+      .then((v) => mounted && setVersion(v))
       .catch(() => {});
 
     const offSnap = onSnapshot((s) => {
@@ -55,7 +60,11 @@ export function Popup() {
   if (!snapshot.auth.logged_in) {
     return (
       <div className="popup">
-        <div className="popup-header"><span className="title">Driftless</span></div>
+        <div className="popup-header">
+          <span className="title">
+            Driftless{version && <span className="version"> v{version}</span>}
+          </span>
+        </div>
         <div className="popup-empty">
           <p style={{ marginTop: 0 }}>Not signed in to the GitHub CLI.</p>
           <p style={{ color: "var(--fg-muted)", fontSize: 12 }}>
@@ -83,7 +92,9 @@ export function Popup() {
     <div className="popup">
       <div className="popup-header">
         <StatusIcon aggregate={snapshot.aggregate} size={14} />
-        <span className="title">Driftless</span>
+        <span className="title">
+          Driftless{version && <span className="version"> v{version}</span>}
+        </span>
         <span className="meta">{auth.login ? `@${auth.login}` : ""}</span>
       </div>
 

@@ -1,7 +1,7 @@
 {
   "name": "driftless",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Menu-bar tracker for GitHub Actions on your PRs and watched repos",
   "license": "GPL-3.0-or-later",
@@ -22,7 +22,8 @@
     "tauri:build": "tauri build",
     "tauri:build:arm64": "tauri build --target aarch64-apple-darwin",
     "tauri:build:x86_64": "tauri build --target x86_64-apple-darwin",
-    "tauri:build:universal": "tauri build --target universal-apple-darwin"
+    "tauri:build:universal": "tauri build --target universal-apple-darwin",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

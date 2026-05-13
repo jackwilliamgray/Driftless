@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import type {
   AppSnapshot,
   NotificationPrefs,
@@ -27,6 +28,7 @@ export function Dashboard() {
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultPrefs);
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [version, setVersion] = useState<string>("");
 
   const handleRefresh = () => {
     setIsRefreshing(true);
@@ -91,6 +93,7 @@ export function Dashboard() {
     document.body.classList.add("dashboard");
     let mounted = true;
     getSnapshot().then((s) => mounted && setSnapshot(s)).catch(() => {});
+    getVersion().then((v) => mounted && setVersion(v)).catch(() => {});
     const offSnap = onSnapshot((s) => {
       if (!mounted) return;
       setSnapshot(s);
@@ -114,7 +117,9 @@ export function Dashboard() {
   return (
     <div className="dashboard-root">
       <aside className="dashboard-sidebar">
-        <h1>Driftless</h1>
+        <h1>
+          Driftless{version && <span className="version"> v{version}</span>}
+        </h1>
         <nav>
           <button className={view === "prs" ? "active" : ""} onClick={() => setView("prs")}>
             My pull requests

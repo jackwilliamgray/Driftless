@@ -1,11 +1,17 @@
 use tauri::image::Image;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, PhysicalPosition};
-use tauri_plugin_positioner::{Position, WindowExt};
+use tauri::{AppHandle, Manager, PhysicalPosition, Rect};
 use tracing::{debug, info, warn};
 
 use crate::state::AggregateState;
+
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+// Matches the configured logical width of the tray-popup window in
+// tauri.conf.json. The popup is non-resizable so this stays in sync as long as
+// the config does.
+const POPUP_LOGICAL_WIDTH: f64 = 360.0;
 
 const TRAY_ICON_ID: &str = "main-tray";
 
@@ -18,6 +24,14 @@ const ICON_FAILURE: &[u8] = include_bytes!("../../icons/icon-failed.png");
 const ICON_REFRESHING: &[u8] = ICON_PENDING;
 
 pub fn install(app: &AppHandle) -> tauri::Result<()> {
+    let version_label = MenuItem::with_id(
+        app,
+        "version",
+        format!("Driftless v{APP_VERSION}"),
+        false,
+        None::<&str>,
+    )?;
+    let sep_top = PredefinedMenuItem::separator(app)?;
     let show_dashboard = MenuItem::with_id(
         app,
         "show_dashboard",
@@ -27,7 +41,10 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
     )?;
     let refresh = MenuItem::with_id(app, "refresh", "Refresh", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Driftless", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_dashboard, &refresh, &quit])?;
+    let menu = Menu::with_items(
+        app,
+        &[&version_label, &sep_top, &show_dashboard, &refresh, &quit],
+    )?;
 
     let icon = Image::from_bytes(ICON_IDLE)?;
 
@@ -36,7 +53,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
         .icon_as_template(true)
         .menu(&menu)
         .show_menu_on_left_click(false)
-        .tooltip("Driftless")
+        .tooltip(format!("Driftless v{APP_VERSION}"))
         .on_menu_event(move |app, event| match event.id().as_ref() {
             "show_dashboard" => {
                 if let Some(w) = app.get_webview_window("dashboard") {
@@ -55,12 +72,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
         })
         .on_tray_icon_event(|tray, event| {
             let app = tray.app_handle();
-            // Forward to positioner first so its rect cache is current before
-            // we ask it to position the popup. Suspected source of intermittent
-            // multi-monitor crashes — log generously so any panic from inside
-            // the plugin leaves a breadcrumb in the log file.
             debug!(?event, "tray event");
-            tauri_plugin_positioner::on_tray_event(app, &event);
 
             if let TrayIconEvent::Click {
                 button: MouseButton::Left,
@@ -76,7 +88,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
                     rect = ?rect,
                     "tray left-click"
                 );
-                toggle_popup(app, *position);
+                toggle_popup(app, rect);
             }
             if let TrayIconEvent::DoubleClick { .. } = &event {
                 debug!("tray double-click → opening dashboard");
@@ -91,7 +103,7 @@ pub fn install(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-fn toggle_popup(app: &AppHandle, click_pos: PhysicalPosition<f64>) {
+fn toggle_popup(app: &AppHandle, tray_rect: &Rect) {
     let Some(window) = app.get_webview_window("tray-popup") else {
         warn!("no tray-popup window registered");
         return;
@@ -107,16 +119,39 @@ fn toggle_popup(app: &AppHandle, click_pos: PhysicalPosition<f64>) {
         Ok(false) => debug!("popup hidden → positioning & showing"),
         Err(e) => warn!(error = %e, "is_visible() failed; assuming hidden"),
     }
-    // Seed the popup onto the tray's monitor before asking the positioner
-    // plugin to compute TrayCenter. tauri-plugin-positioner unconditionally
-    // calls `window.current_monitor()?.unwrap()`, which panics for a hidden
-    // window that has no monitor binding — e.g. when the tray click happens
-    // on a different display than the popup was last shown on.
-    let seed = PhysicalPosition::new(click_pos.x as i32, click_pos.y as i32);
-    if let Err(e) = window.set_position(seed) {
-        warn!(error = %e, "failed to seed popup position");
-    }
-    if let Err(e) = window.move_window(Position::TrayCenter) {
+    // Self-position rather than going through tauri-plugin-positioner.
+    // The plugin's TrayCenter calls `window.current_monitor()?.unwrap()`
+    // unconditionally, which panics for a hidden popup that has no monitor
+    // binding yet — the exact crash hit when clicking the tray on a different
+    // monitor than the popup was last shown on (especially across mixed
+    // scale factors, e.g. built-in Retina vs external).
+    let probe_scale = window.scale_factor().unwrap_or(1.0);
+    let tray_pos = tray_rect.position.to_physical::<i32>(probe_scale);
+    let tray_size = tray_rect.size.to_physical::<i32>(probe_scale);
+    let tray_center_x = tray_pos.x as f64 + tray_size.width as f64 / 2.0;
+    let tray_top_y = tray_pos.y as f64;
+
+    // Look up the tray icon's monitor to get its actual scale factor — the
+    // popup width is configured in logical units, and we need physical pixels
+    // of the destination display for the centering math.
+    let target_scale = match window.monitor_from_point(tray_center_x, tray_top_y) {
+        Ok(Some(m)) => m.scale_factor(),
+        Ok(None) => {
+            warn!("monitor_from_point returned None; falling back to popup scale");
+            probe_scale
+        }
+        Err(e) => {
+            warn!(error = %e, "monitor_from_point failed; falling back to popup scale");
+            probe_scale
+        }
+    };
+
+    let popup_phys_width = (POPUP_LOGICAL_WIDTH * target_scale).round() as i32;
+    let x = tray_pos.x + tray_size.width / 2 - popup_phys_width / 2;
+    let y = tray_pos.y + tray_size.height;
+    debug!(x, y, target_scale, "positioning popup below tray icon");
+
+    if let Err(e) = window.set_position(PhysicalPosition::new(x, y)) {
         warn!(error = %e, "failed to position popup");
     }
     if let Err(e) = window.show() {

@@ -1,6 +1,6 @@
 [package]
 name = "driftless"
-version = "0.1.0"
+version = "0.3.0"
 description = "Menu-bar tracker for GitHub Actions on your PRs and watched repos"
 authors = ["Jack Gray"]
 edition = "2021"
@@ -33,7 +33,6 @@ tauri = { version = "2", features = ["image-png", "tray-icon", "macos-private-ap
 tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri-plugin-positioner = { version = "2.3.1", features = ["tray-icon"] }
 tauri-plugin-store = "2.4.2"
 tauri-plugin-notification = "2.3.3"
 tauri-plugin-shell = "2.3.5"
